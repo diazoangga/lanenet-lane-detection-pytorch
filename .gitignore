@@ -1,0 +1,5 @@
+logs/
+data/
+old/
+__pycache__/
+train_old/
