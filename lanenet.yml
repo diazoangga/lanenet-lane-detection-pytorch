@@ -56,9 +56,9 @@ TRAIN:
         WEIGHT_PATH: './weights/lanenet_ckpt.epoch55-loss0.08.h5'
     SNAPSHOT_EPOCH: 8
     BATCH_SIZE: 8
-    VAL_BATCH_SIZE: 4
+    VAL_BATCH_SIZE: 8
     EPOCH_NUMS: 80
-    LOSS_WEIGHTS: [1,1]
+    LOSS: 'SpatialEmbed'
     WARM_UP:
         ENABLE: True
         EPOCH_NUMS: 8

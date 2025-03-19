@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 from dataset_utils import SegmentationDataset, read_dataset
 from bisenetv2 import BiseNetV2
-from loss_function import instance_loss
+from loss_function import instance_loss, SpatialEmbLoss
 from config_utils import Config
 from metrics import CalculateMetrics
 from tqdm import tqdm
@@ -33,7 +33,7 @@ num_epochs = CFG.TRAIN.EPOCH_NUMS
 batch_size = CFG.TRAIN.BATCH_SIZE
 val_batch_size = CFG.TRAIN.VAL_BATCH_SIZE
 learning_rate = CFG.SOLVER.LR
-loss_weights = CFG.TRAIN.LOSS_WEIGHTS
+loss_type = CFG.TRAIN.LOSS
 save_path = os.path.join(CFG.TRAIN.MODEL_SAVE_DIR, date_time)
 continue_train = CFG.TRAIN.RESTORE_FROM_CHECKPOINT.ENABLE
 model_path = CFG.TRAIN.RESTORE_FROM_CHECKPOINT.WEIGHT_PATH
@@ -71,7 +71,10 @@ if continue_train:
     criterion_disc = criterion[1]
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 else:
-    criterion_disc = instance_loss
+    if loss_type == 'SpatialEmbed':
+        criterion_disc = SpatialEmbLoss()
+    else:
+        criterion_disc = instance_loss
     criterion_ce = nn.CrossEntropyLoss().cuda()
     criterion = [criterion_ce, criterion_disc]
 metrics = CalculateMetrics(num_classes=2)
@@ -113,7 +116,10 @@ for epoch in range(num_epochs):
         # print(bin_pred.shape, inst_pred.shape)
         # print(bin.shape, inst.shape)
         ce_loss = criterion[0](bin_pred, bin)
-        inst_loss = criterion[1](inst, inst_pred)
+        if loss_type == 'SpatialEmbed':
+            inst_loss = criterion[1](inst_pred, inst, bin)
+        else:
+            inst_loss = criterion[1](inst, inst_pred)
         loss = ce_loss + inst_loss
         loss.backward()
         optimizer.step()
@@ -146,21 +152,25 @@ for epoch in range(num_epochs):
             images, bins, insts = images.to(device), bins.to(device), insts.to(device)
             bin_pred, inst_pred = model(images)
             ce_loss = criterion[0](bin_pred, bins)
-            inst_loss = criterion[1](insts, inst_pred)
+            if loss_type == 'SpatialEmbed':
+                inst_loss = criterion[1](inst_pred, inst, bin)
+            else:
+                inst_loss = criterion[1](inst, inst_pred)
             loss = ce_loss + inst_loss
             val_loss += loss.item()
             val_ce_loss += ce_loss.item()
+            val_inst_loss += inst_loss.item()
             val_inst_loss += inst_loss.item()
             batch_val_metrics = metrics(bins, bin_pred)
             for key in val_metrics:
                 val_metrics[key] += batch_metrics[key]
             count += 1
             val_pbar.set_postfix(validation_loss=loss.item(), 
-                                 val_ce_loss=ce_loss.item(),
-                                 val_inst_loss=inst_loss.item(),
-                                 iou=batch_metrics['iou'], 
-                                 dice=batch_metrics['dice'], 
-                                 acc=batch_metrics['accuracy'])
+                                val_ce_loss=ce_loss.item(),
+                                val_inst_loss=inst_loss.item(),
+                                iou=batch_metrics['iou'], 
+                                dice=batch_metrics['dice'], 
+                                acc=batch_metrics['accuracy'])
 
         for key in val_metrics:
             val_metrics[key] /= count
