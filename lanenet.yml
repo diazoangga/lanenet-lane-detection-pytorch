@@ -36,7 +36,7 @@ FREEZE:
     MODEL_FILENAME: 'model'
     PARAMS_FILENAME: 'params'
 MODEL:
-    MODEL_NAME: 'lanenet'
+    MODEL_NAME: 'SAM'
     FRONT_END: 'bisenetv2'
     EMBEDDING_FEATS_DIMS: 4
     BISENETV2:
@@ -55,9 +55,9 @@ TRAIN:
         START_EPOCH: 5
         WEIGHT_PATH: './weights/lanenet_ckpt.epoch55-loss0.08.h5'
     SNAPSHOT_EPOCH: 8
-    BATCH_SIZE: 8
-    VAL_BATCH_SIZE: 8
-    EPOCH_NUMS: 80
+    BATCH_SIZE: 2
+    VAL_BATCH_SIZE: 2
+    EPOCH_NUMS: 60
     LOSS: 'SpatialEmbed'
     WARM_UP:
         ENABLE: True

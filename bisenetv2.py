@@ -258,13 +258,13 @@ class InstanceSegmentation(nn.Module):
         return out
 
 class BiseNetV2(nn.Module):
-    def __init__(self):
+    def __init__(self, out_channels=4):
         super(BiseNetV2, self).__init__()
         self.detail_branch = DetailBranch()
         self.semantic_branch = SemanticBranch()
         self.aggregation_branch = AggregationBranch(128)
         self.bin_segmentation = BinarySegmentation(2)
-        self.inst_segmentation = InstanceSegmentation(4)
+        self.inst_segmentation = InstanceSegmentation(out_channels)
     
     def forward(self, input_tensor):
         d_branch = self.detail_branch(input_tensor)

@@ -207,8 +207,8 @@ if __name__ == "__main__":
     net_out = torch.randn(8, 4, 256, 512).to("cuda")  # Random tensor simulating network output
     instance_label = torch.randint(0,4, (8, 1, 256, 512)).to("cuda")/4  # Random labels simulating instance segmentation
     bin_label = torch.randn(8, 256,512).to("cuda")
-    # loss_value = instance_loss(instance_label, net_out)
+    loss_value = instance_loss(instance_label, net_out)
     # loss_value_1 = instance_loss_1(instance_label, net_out)
-    loss = SpatialEmbLoss()
-    l = loss(net_out, instance_label, bin_label)
-    print("Instance Loss:", l.item())
+    # loss = SpatialEmbLoss()
+    # l = loss(net_out, instance_label, bin_label)
+    print("Instance Loss:", loss_value)
