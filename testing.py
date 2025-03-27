@@ -17,6 +17,7 @@ from metrics import CalculateMetrics, compute_batch_metrics
 from tqdm import tqdm
 from utils import save_plot
 from sam import Sam
+from unetPP import UNetPP
 
 torch.manual_seed(120)
 random.seed(120)
@@ -58,6 +59,8 @@ if model_arch == 'BiSeNetV2':
     model = BiseNetV2(out_channels=5 if loss_type=='SpatialEmbed' else 4).to(device)
 elif model_arch == 'SAM':
     model = Sam(num_classes=5 if loss_type=='SpatialEmbed' else 4).to(device)
+elif model_arch == 'UNet++':
+    model = UNetPP(out_channels=5 if loss_type=='SpatialEmbed' else 4).to(device)
 
 checkpoint = torch.load(model_path)
 model.load_state_dict(checkpoint['model_state_dict'])

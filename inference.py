@@ -8,6 +8,7 @@ from torchvision import transforms
 from bisenetv2 import BiseNetV2
 from PIL import Image
 from sam import Sam
+from datetime import datetime
 # from scipy import ndimage as ndi
 
 
@@ -61,8 +62,8 @@ def gen_instance_mask(sem_pred, ins_pred, n_obj):
     sem_pred = sem_pred.to(torch.bool).detach().cpu().numpy()
     ins_pred = ins_pred.detach().cpu().numpy()
 
-    print("Instance Prediction Shape:", ins_pred.shape)  # (4, 512, 256)
-    print("Semantic Prediction Shape:", sem_pred.shape)  # (512, 256)
+    # print("Instance Prediction Shape:", ins_pred.shape)  # (4, 512, 256)
+    # print("Semantic Prediction Shape:", sem_pred.shape)  # (512, 256)
 
 
     C, H, W = ins_pred.shape
@@ -70,9 +71,10 @@ def gen_instance_mask(sem_pred, ins_pred, n_obj):
 
     embeddings = ins_pred[:, sem_pred.reshape(-1)].T  
 
-    print("Extracted Embeddings Shape:", embeddings.shape) 
+    # print("Extracted Embeddings Shape:", embeddings.shape) 
 
     if embeddings.shape[0] < n_obj:
+        return None
         raise ValueError(f"Not enough valid pixels ({embeddings.shape[0]}) for {n_obj} clusters.")
 
     clustering = KMeans(n_clusters=n_obj, random_state=42).fit(embeddings)
@@ -92,8 +94,13 @@ def gen_color_img(sem_pred, ins_pred, n_obj):
 
 def inference_bisenetv2(model, img_path, max_num_lanes=4):
     input_img = img_preprocess(img_path)
+    t0 = datetime.now()
+    
     with torch.no_grad():
         bin_pred, inst_pred = model(input_img)
+    t1 = datetime.now()
+
+    print(1000000/(t1.microsecond-t0.microsecond))
     
     bin_pred = bin_pred.detach().cpu()
     bin_pred = torch.argmax(bin_pred, dim=1, keepdim=True).squeeze()
@@ -143,7 +150,7 @@ class Cluster:
         spatial_emb = torch.tanh(prediction[0:2]) + xym_s  # 2 x h x w
         sigma = prediction[2:2+n_sigma]  # n_sigma x h x w
         seed_map = torch.sigmoid(prediction[2+n_sigma:2+n_sigma + 1])  # 1 x h x w
-        print(seed_map.shape)
+        # print(seed_map.shape)
        
         instance_map = torch.zeros(height, width, dtype=torch.uint8, device='cuda')
         instances = []
@@ -262,11 +269,11 @@ def inference_spatial_embed(model, img_path, n_sigma=2, threshold=0.5, dist_th=0
     inst_pred = inst_pred.squeeze()
 
     cluster = Cluster()
-    print(inst_pred.shape)
+    # print(inst_pred.shape)
     instance_map, instance = cluster.cluster(inst_pred, binary_mask=bin_pred, n_sigma=2, dist_th=dist_th)
     instance_map = instance_map
     # instance_mask = instance[1]['mask']
-    print(instance_map.shape, torch.unique(instance_map))
+    # print(instance_map.shape, torch.unique(instance_map))
     # print(predictions)
     # sigma_x = inst_pred[0
     # seed_map = torch.sigmoid(inst_pred[4])
@@ -319,33 +326,38 @@ def inference_spatial_embed(model, img_path, n_sigma=2, threshold=0.5, dist_th=0
     # print(np.unique(instance_map))
 
     
+if __name__ == '__main__':
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # Load model
+    model_path = "./train_out/UNet-Discloss/epoch032-loss6.30.pt"
+    # model = BiseNetV2(out_channels=4).to(device)
+    model = Sam(num_classes=4).to(device)
+    checkpoint = torch.load(model_path, weights_only=False)
+    print(checkpoint.keys())
+    model.load_state_dict(checkpoint['model_state_dict'])
+    model.eval()
 
-# Load model
-model_path = "./train_out/epoch002-loss2.59.pt"
-# model = BiseNetV2(out_channels=5).to(device)
-model = Sam(num_classes=5).to(device)
-checkpoint = torch.load(model_path, weights_only=False)
-print(checkpoint.keys())
-model.load_state_dict(checkpoint['model_state_dict'])
-model.eval()
+    image_path = "./data/driver_23_30frame/05151649_0422.MP4/00180.jpg"
 
-image_path = "./data/driver_23_30frame/05151649_0422.MP4/00180.jpg"
-input_img, bin_pred, lane_img = inference_bisenetv2(model, image_path)
-input_img, bin_pred, lane_img = inference_spatial_embed(model, image_path, n_sigma=2, dist_th=0.9)
+    # t0 = datetime.now()
+    input_img, bin_pred, lane_img = inference_bisenetv2(model, image_path)
+    # t1 = datetime.now()
 
-fig, axes = plt.subplots(1,3, figsize=(15,5))
-axes[0].imshow(input_img)
-axes[0].set_title('Original Image')
-axes[0].axis('off')
+    # print(1000000/(t1.microsecond-t0.microsecond))
+    # input_img, bin_pred, lane_img = inference_spatial_embed(model, image_path, n_sigma=2, dist_th=0.9)
 
-axes[1].imshow(bin_pred, cmap='gray')
-axes[1].set_title('Binary Lane Detection')
-axes[1].axis('off')
+    fig, axes = plt.subplots(1,3, figsize=(15,5))
+    axes[0].imshow(input_img)
+    axes[0].set_title('Original Image')
+    axes[0].axis('off')
 
-axes[2].imshow(lane_img)
-axes[2].set_title('Semantic Lane Detection')
-axes[2].axis('off')
+    axes[1].imshow(bin_pred, cmap='gray')
+    axes[1].set_title('Binary Lane Detection')
+    axes[1].axis('off')
 
-plt.show()
+    axes[2].imshow(lane_img)
+    axes[2].set_title('Semantic Lane Detection')
+    axes[2].axis('off')
+
+    plt.show()

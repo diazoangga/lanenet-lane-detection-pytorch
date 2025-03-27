@@ -276,7 +276,8 @@ class BiseNetV2(nn.Module):
         
         return [bin_pred, inst_seg]
 
-model = BiseNetV2()
-input_tensor = torch.randn(8, 3, 512, 256)
-output = model(input_tensor)
-print(output[0].shape, output[1].shape)  # Should print torch.Size([1, 2, 512, 256]) torch.Size([1, 3, 512, 256])
+if __name__ == '__main__':
+    model = BiseNetV2()
+    input_tensor = torch.randn(8, 3, 512, 256)
+    output = model(input_tensor)
+    print(output[0].shape, output[1].shape)  # Should print torch.Size([1, 2, 512, 256]) torch.Size([1, 3, 512, 256])
