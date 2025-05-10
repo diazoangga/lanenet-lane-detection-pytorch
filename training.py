@@ -15,6 +15,8 @@ from config_utils import Config
 from metrics import CalculateMetrics
 from tqdm import tqdm
 from utils import save_plot
+from sam import Sam
+from unetPP import UNetPP
 
 torch.manual_seed(120)
 random.seed(120)
@@ -37,7 +39,8 @@ loss_type = CFG.TRAIN.LOSS
 save_path = os.path.join(CFG.TRAIN.MODEL_SAVE_DIR, date_time)
 continue_train = CFG.TRAIN.RESTORE_FROM_CHECKPOINT.ENABLE
 model_path = CFG.TRAIN.RESTORE_FROM_CHECKPOINT.WEIGHT_PATH
-init_epoch = CFG.TRAIN.RESTORE_FROM_CHECKPOINT.START_EPOCH
+init_epoch = CFG.TRAIN.RESTORE_FROM_CHECKPOINT.START_EPOCH if continue_train else 0
+model_arch = CFG.MODEL.MODEL_NAME
 
 if not os.path.exists(save_path):
     os.makedirs(save_path)
@@ -60,19 +63,25 @@ val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 print(f'\nImporting the datasets is completed')
 
 # Model
-model = BiseNetV2().to(device)
+if model_arch == 'BiSeNetV2':
+    model = BiseNetV2(out_channels=5 if loss_type=='SpatialEmbed' else 4).to(device)
+elif model_arch == 'SAM':
+    model = Sam(num_classes=5 if loss_type=='SpatialEmbed' else 4).to(device)
+elif model_arch == 'UNet++':
+    model = UNetPP(inst_channels=5 if loss_type=='SpatialEmbed' else 4).to(device)
+
 optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 if continue_train:
-    checkpoint = torch.load(model_path, weight_only=False)
+    checkpoint = torch.load(model_path)
     model.load_state_dict(checkpoint['model_state_dict'])
-    epoch = checkpoint['epoch']
+    init_epoch = checkpoint['epoch'] + 1
     criterion = checkpoint['loss']
     criterion_ce = criterion[0]
     criterion_disc = criterion[1]
-    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+    # optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 else:
     if loss_type == 'SpatialEmbed':
-        criterion_disc = SpatialEmbLoss()
+        criterion_disc = SpatialEmbLoss(n_sigma=2)
     else:
         criterion_disc = instance_loss
     criterion_ce = nn.CrossEntropyLoss().cuda()
@@ -99,7 +108,7 @@ history = {"train_loss": [],
 # Training loop
 print("Starting Training...")
 count_skip_best_val = 0
-for epoch in range(num_epochs):
+for epoch in range(init_epoch, num_epochs):
     train_metrics = {"iou": 0, "dice": 0, "accuracy": 0}
     count = 0
     model.train()
@@ -160,7 +169,7 @@ for epoch in range(num_epochs):
             val_loss += loss.item()
             val_ce_loss += ce_loss.item()
             val_inst_loss += inst_loss.item()
-            val_inst_loss += inst_loss.item()
+            # val_inst_loss += inst_loss.item()
             batch_val_metrics = metrics(bins, bin_pred)
             for key in val_metrics:
                 val_metrics[key] += batch_metrics[key]
